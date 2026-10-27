@@ -28,8 +28,9 @@ export function App() {
   const updateTask = (id:string,fn:(task:MarketTask)=>MarketTask) => setTasks((current)=>current.map((t)=>t.id===id?fn(t):t));
   const flash = (message:string) => { setNotice(message); window.setTimeout(()=>setNotice(''),3800); };
   function createTask() {
-    if (!form.title.trim()||!form.outcome.trim()||Number(form.budget)<=0) { flash('Заполните название, результат и положительный бюджет.'); return; }
-    const item:MarketTask={id:'task-'+Date.now(),title:form.title.trim(),vertical:form.vertical,category:form.category,company:form.company.trim()||'Заказчик',description:form.description.trim(),outcome:form.outcome.trim(),criteria:form.criteria.split('\n').map(x=>x.trim()).filter(Boolean),budget:Number(form.budget),days:Number(form.days)||30,skills:form.skills.split(',').map(x=>x.trim()).filter(Boolean),status:'open',proposals:[],createdAt:new Date().toISOString()};
+    const budget=Number(form.budget);const days=Number(form.days);
+    if (!form.title.trim()||!form.outcome.trim()||!Number.isFinite(budget)||budget<=0||!Number.isInteger(days)||days<=0) { flash('Укажите название, ожидаемый результат, положительный бюджет и срок в целых днях.'); return; }
+    const item:MarketTask={id:'task-'+Date.now(),title:form.title.trim(),vertical:form.vertical,category:form.category,company:form.company.trim()||'Заказчик',description:form.description.trim(),outcome:form.outcome.trim(),criteria:form.criteria.split('\n').map(x=>x.trim()).filter(Boolean),budget,days,skills:form.skills.split(',').map(x=>x.trim()).filter(Boolean),status:'open',proposals:[],createdAt:new Date().toISOString()};
     setTasks((current)=>[item,...current]);setVertical(item.vertical);setSelected(item.id);setShowCreate(false);setTab('market');flash('Задача опубликована в демонстрационном пространстве.');
   }
   function submitProposal(taskId:string) {
@@ -62,7 +63,7 @@ export function App() {
     const actor=to==='active'?'Система демо':to==='submitted'?c.specialist:to==='accepted'?'Заказчик':to==='disputed'?'Участник сделки':'Заказчик';
     const details:Record<string,string>={proposed:'Условия предложены второй стороне.',active:c.status==='submitted'?'Этап возвращён в работу для доработки.':'Стороны подтвердили условия; этапы переведены в работу.',submitted:'Исполнитель передал результат этапа на приёмку.',accepted:allAccepted?'Все этапы приняты; контракт завершён.':'Этап принят; оставшиеся этапы возвращены в работу.',disputed:'Зафиксирован спор. Нужна независимая процедура разрешения.',cancelled:'Контракт отменён в рамках допустимого перехода.',draft:'Черновик условий.'};
     const event:ContractEvent={id:'e-'+Date.now(),at:new Date().toISOString(),actor,type:to,detail:details[to],version:c.version};
-    updateTask(task.id,(t)=>({...t,status:finalStatus==='active'?'in_progress':finalStatus==='submitted'?'acceptance':finalStatus==='accepted'?'completed':finalStatus==='disputed'?'disputed':finalStatus==='cancelled'?'open':'contracting',contract:{...c,status:finalStatus,milestones,events:[event,...c.events]}}));flash('Событие записано в локальный журнал. Это не блокчейн и не платёж.');
+    updateTask(task.id,(t)=>({...t,status:finalStatus==='active'?'in_progress':finalStatus==='submitted'?'acceptance':finalStatus==='accepted'?'completed':finalStatus==='disputed'?'disputed':finalStatus==='cancelled'?'cancelled':'contracting',contract:{...c,status:finalStatus,milestones,events:[event,...c.events]}}));flash('Событие записано в локальный журнал. Это не блокчейн и не платёж.');
   }
   function addEvidence(task:MarketTask,milestoneId:string) {
     if (!task.contract || task.contract.status !== 'active' || !canTransition(task.contract.status, 'submitted')) { flash('Подтверждение можно добавить только в активном контракте.'); return; }
