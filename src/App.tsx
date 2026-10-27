@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Activity, ArrowDownRight, ArrowUpRight, BadgeCheck, Banknote, BriefcaseBusiness, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, FileCheck2, Filter, Gauge, Handshake, Layers3, Plus, Search, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react';
+import { Activity, ArrowUpRight, BadgeCheck, Banknote, BriefcaseBusiness, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, FileCheck2, Filter, Gauge, Handshake, Layers3, Plus, Search, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react';
 import { canTransition, contractStatusLabel, money, seedTasks, statusLabel, verticals, type ContractEvent, type ContractStatus, type MarketTask, type Milestone, type Proposal, type VerticalId } from './domain';
 
 type Tab = 'market' | 'my-work' | 'contracts' | 'talent';
