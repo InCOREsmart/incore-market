@@ -34,7 +34,7 @@ export const verticals: Vertical[] = [
   { id:'management', label:'Управленческие задачи', eyebrow:'STRATEGY / CHANGE', description:'Диагностика и изменения для руководителей, которым нужны решения и исполнение.', categories:['Стратегия','Оргтрансформация','Операционная модель','Управленческая аналитика'] },
 ];
 export const statusLabel: Record<TaskStatus,string> = {
-  open:'Открыта', reviewing:'Выбор исполнителя', contracting:'Согласование условий', in_progress:'В работе', acceptance:'Приёмка результата', completed:'Завершена', disputed:'Спор'
+  open:'Открыта', reviewing:'Выбор исполнителя', contracting:'Согласование условий', in_progress:'В работе', acceptance:'Приёмка результата', completed:'Завершена', disputed:'Спор', cancelled:'Отменена'
 };
 export const contractStatusLabel: Record<ContractStatus,string> = {
   draft:'Черновик', proposed:'Условия предложены', active:'В работе', submitted:'На приёмке', accepted:'Принят', disputed:'Спор', cancelled:'Отменён'
