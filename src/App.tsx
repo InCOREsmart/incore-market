@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowUpRight, BadgeCheck, Banknote, BriefcaseBusiness, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, FileCheck2, Filter, Gauge, Handshake, Layers3, Plus, Search, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react';
 import { canTransition, contractStatusLabel, money, seedTasks, statusLabel, verticals, type ContractEvent, type ContractStatus, type MarketTask, type Milestone, type Proposal, type VerticalId } from './domain';
 
@@ -8,7 +8,8 @@ const dateShort = (iso:string) => new Intl.DateTimeFormat('ru-RU',{day:'numeric'
 const statusTone = (status:string) => ['completed','accepted'].includes(status) ? 'green' : ['disputed','cancelled'].includes(status) ? 'red' : ['in_progress','active','submitted','acceptance'].includes(status) ? 'blue' : 'amber';
 
 export function App() {
-  const [tasks,setTasks] = useState<MarketTask[]>(initialTasks);
+  const [tasks,setTasks] = useState<MarketTask[]>(() => { try { const saved=window.localStorage.getItem('incore-market-demo-tasks'); return saved ? JSON.parse(saved) as MarketTask[] : initialTasks; } catch { return initialTasks; } });
+  useEffect(() => { try { window.localStorage.setItem('incore-market-demo-tasks',JSON.stringify(tasks)); } catch { /* Browser storage may be disabled; the current session still works. */ } },[tasks]);
   const [vertical,setVertical] = useState<VerticalId|'all'>('all');
   const [tab,setTab] = useState<Tab>('market');
   const [query,setQuery] = useState('');
