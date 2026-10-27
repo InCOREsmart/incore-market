@@ -1,5 +1,5 @@
 export type VerticalId = 'efficiency' | 'sales' | 'projects' | 'digital' | 'hr' | 'management';
-export type TaskStatus = 'open' | 'reviewing' | 'contracting' | 'in_progress' | 'acceptance' | 'completed' | 'disputed';
+export type TaskStatus = 'open' | 'reviewing' | 'contracting' | 'in_progress' | 'acceptance' | 'completed' | 'disputed' | 'cancelled';
 export type ContractStatus = 'draft' | 'proposed' | 'active' | 'submitted' | 'accepted' | 'disputed' | 'cancelled';
 export type MilestoneStatus = 'pending' | 'submitted' | 'accepted' | 'rejected';
 
