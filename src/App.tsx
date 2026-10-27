@@ -24,8 +24,8 @@ export function App() {
   const [proposalForm,setProposalForm] = useState({specialist:'Мой профиль',headline:'',pitch:'',price:'',days:'20',skills:''});
   const selectedTask = tasks.find((t) => t.id===selected) ?? null;
   const filtered = useMemo(() => tasks.filter((t) => (vertical==='all'||t.vertical===vertical) && (filterStatus==='all'||t.status===filterStatus) && (t.title+' '+t.company+' '+t.category+' '+t.skills.join(' ')).toLowerCase().includes(query.toLowerCase())),[tasks,vertical,filterStatus,query]);
-  const allContracts = tasks.filter((t) => t.contract);
-  const myWork = tasks.filter((t) => t.status==='in_progress'||t.status==='acceptance'||t.status==='completed'||t.status==='disputed');
+  const allContracts = tasks.filter((t) => t.contract && (role==='employer' || t.contract.specialist==='Мой профиль'));
+  const myWork = role==='employer' ? tasks.filter((t) => t.status==='in_progress'||t.status==='acceptance'||t.status==='completed'||t.status==='disputed') : tasks.filter((t) => t.proposals.some(p=>p.specialist==='Мой профиль'));
   const totalBudget = tasks.filter((t)=>t.status==='open').reduce((sum,t)=>sum+t.budget,0);
   const updateTask = (id:string,fn:(task:MarketTask)=>MarketTask) => setTasks((current)=>current.map((t)=>t.id===id?fn(t):t));
   const flash = (message:string) => { setNotice(message); window.setTimeout(()=>setNotice(''),3800); };
