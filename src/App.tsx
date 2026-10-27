@@ -40,11 +40,13 @@ export function App() {
     updateTask(taskId,(t)=>({...t,proposals:[p,...t.proposals],status:t.status==='open'?'reviewing':t.status}));setShowProposal(null);setProposalForm({specialist:'Мой профиль',headline:'',pitch:'',price:'',days:'20',skills:''});flash('Предложение добавлено. Это локальные демоданные.');
   }
   function selectProposal(task:MarketTask,p:Proposal) {
+    if (task.contract || !['open','reviewing'].includes(task.status)) { flash('Для этой задачи уже начато согласование контракта.'); return; }
+    if (!task.proposals.some((candidate) => candidate.id === p.id)) { flash('Предложение больше недоступно.'); return; }
     const now=new Date().toISOString();
     const milestones:Milestone[]=[{id:'m1',title:'Диагностика и базовая линия',amount:Math.round(p.price*.3),due:dateShort(new Date(Date.now()+7*86400000).toISOString()),criteria:'Согласованный документ с исходными данными, источниками и допущениями.',status:'pending'},{id:'m2',title:'Решение и план внедрения',amount:Math.round(p.price*.4),due:dateShort(new Date(Date.now()+16*86400000).toISOString()),criteria:'Решение, расчёт эффекта, владельцы, сроки и риски.',status:'pending'},{id:'m3',title:'Итоговая защита и передача',amount:p.price-Math.round(p.price*.3)-Math.round(p.price*.4),due:dateShort(new Date(Date.now()+Number(p.days)*86400000).toISOString()),criteria:'Итоговый результат передан заказчику и проверен по критериям.',status:'pending'}];
     const event:ContractEvent={id:'e-'+Date.now(),at:now,actor:'Заказчик',type:'terms_proposed',detail:'Создана версия 1 условий на основе выбранного предложения.',version:1};
     const contract={id:'contract-'+Date.now(),version:1,status:'proposed' as ContractStatus,client:task.company,specialist:p.specialist,amount:p.price,scope:task.outcome,acceptanceCriteria:[...task.criteria],milestones,events:[event]};
-    updateTask(task.id,(t)=>({...t,status:'contracting',contract}));setTab('contracts');flash('Черновик контракта создан. Никакие деньги не резервируются.');
+    updateTask(task.id,(t)=>({...t,status:'contracting',contract,proposals:t.proposals.map((candidate)=>({...candidate,score:candidate.id===p.id?candidate.score:candidate.score}))}));setTab('contracts');flash('Черновик контракта создан. Никакие деньги не резервируются.');
   }
   function transition(task:MarketTask,to:ContractStatus) {
     const c=task.contract;if(!c||!canTransition(c.status,to)){flash('Переход запрещён текущим состоянием контракта.');return;}
@@ -54,7 +56,10 @@ export function App() {
     updateTask(task.id,(t)=>({...t,status:to==='active'?'in_progress':to==='submitted'?'acceptance':to==='accepted'?'completed':to==='disputed'?'disputed':to==='cancelled'?'open':'contracting',contract:{...c,status:to,events:[event,...c.events]}}));flash('Событие записано в локальный журнал. Это не блокчейн и не платёж.');
   }
   function addEvidence(task:MarketTask,milestoneId:string) {
-    const evidence=window.prompt('Ссылка или описание подтверждения результата:');if(!evidence?.trim()||!task.contract)return;
+    if (!task.contract || task.contract.status !== 'active' || !canTransition(task.contract.status, 'submitted')) { flash('Подтверждение можно добавить только в активном контракте.'); return; }
+    const milestone=task.contract.milestones.find((m)=>m.id===milestoneId);
+    if (!milestone || milestone.status !== 'pending') { flash('Этот этап уже отправлен или закрыт.'); return; }
+    const evidence=window.prompt('Ссылка или описание подтверждения результата:');if(!evidence?.trim())return;
     const c=task.contract;const event:ContractEvent={id:'e-'+Date.now(),at:new Date().toISOString(),actor:c.specialist,type:'evidence_submitted',detail:'Подтверждение добавлено к этапу: '+evidence.trim(),version:c.version};
     updateTask(task.id,(t)=>({...t,contract:{...c,status:'submitted',milestones:c.milestones.map(m=>m.id===milestoneId?{...m,status:'submitted',evidence:evidence.trim()}:m),events:[event,...c.events]}}));flash('Подтверждение сохранено в демоданных.');
   }
