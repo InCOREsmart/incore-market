@@ -34,11 +34,11 @@ function MarketplaceApp({ role, userId, email, displayName, onSignOut }: Marketp
   const [notice,setNotice] = useState('');
   const [filterStatus,setFilterStatus] = useState('all');
   const [form,setForm] = useState({title:'',vertical:'efficiency' as VerticalId,category:'Оптимизация ФОТ',company:'Новая компания',description:'',outcome:'',criteria:'',budget:'250000',days:'30',skills:'финансовая модель, процессы'});
-  const [proposalForm,setProposalForm] = useState({specialist:'Мой профиль',headline:'',pitch:'',price:'',days:'20',skills:''});
+  const [proposalForm,setProposalForm] = useState({specialist:displayName,headline:'',pitch:'',price:'',days:'20',skills:''});
   const selectedTask = tasks.find((t) => t.id===selected) ?? null;
   const filtered = useMemo(() => tasks.filter((t) => (vertical==='all'||t.vertical===vertical) && (filterStatus==='all'||t.status===filterStatus) && (t.title+' '+t.company+' '+t.category+' '+t.skills.join(' ')).toLowerCase().includes(query.toLowerCase())),[tasks,vertical,filterStatus,query]);
-  const allContracts = tasks.filter((t) => t.contract && (role==='employer' || t.contract.specialist==='Мой профиль'));
-  const myWork = role==='employer' ? tasks.filter((t) => t.status==='in_progress'||t.status==='acceptance'||t.status==='completed'||t.status==='disputed') : tasks.filter((t) => t.proposals.some(p=>p.specialist==='Мой профиль'));
+  const allContracts = tasks.filter((t) => t.contract && (role==='employer' || t.contract.specialist===displayName));
+  const myWork = role==='employer' ? tasks.filter((t) => t.status==='in_progress'||t.status==='acceptance'||t.status==='completed'||t.status==='disputed') : tasks.filter((t) => t.proposals.some(p=>p.specialist===displayName));
   const totalBudget = tasks.filter((t)=>t.status==='open').reduce((sum,t)=>sum+t.budget,0);
   const updateTask = (id:string,fn:(task:MarketTask)=>MarketTask) => setTasks((current)=>current.map((t)=>t.id===id?fn(t):t));
   const flash = (message:string) => { setNotice(message); window.setTimeout(()=>setNotice(''),3800); };
@@ -54,7 +54,7 @@ function MarketplaceApp({ role, userId, email, displayName, onSignOut }: Marketp
     if(!['open','reviewing'].includes(task.status)||task.contract){flash('Приём предложений по этой задаче закрыт.');return;}
     if(!proposalForm.headline.trim()||!proposalForm.pitch.trim()||!Number.isFinite(price)||price<=0||!Number.isInteger(days)||days<=0){flash('Укажите подход, описание, положительную стоимость и срок в целых днях.');return;}
     const p:Proposal={id:'p-'+Date.now(),specialist:proposalForm.specialist.trim()||'Специалист',headline:proposalForm.headline.trim(),pitch:proposalForm.pitch.trim(),price,days,skills:proposalForm.skills.split(',').map(x=>x.trim()).filter(Boolean),score:0,createdAt:new Date().toISOString()};
-    updateTask(taskId,(t)=>({...t,proposals:[p,...t.proposals],status:t.status==='open'?'reviewing':t.status}));setShowProposal(null);setProposalForm({specialist:'Мой профиль',headline:'',pitch:'',price:'',days:'20',skills:''});flash('Предложение добавлено. Это локальные демоданные.');
+    updateTask(taskId,(t)=>({...t,proposals:[p,...t.proposals],status:t.status==='open'?'reviewing':t.status}));setShowProposal(null);setProposalForm({specialist:displayName,headline:'',pitch:'',price:'',days:'20',skills:''});flash('Предложение добавлено. Это локальные демоданные.');
   }
   function selectProposal(task:MarketTask,p:Proposal) {
     if (task.contract || !['open','reviewing'].includes(task.status)) { flash('Для этой задачи уже начато согласование контракта.'); return; }
