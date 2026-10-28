@@ -1,6 +1,6 @@
 # InCORE Market
 
-**Единое ядро для рынка работы по измеримому результату.** InCORE Market соединяет бизнес-заказчиков и специалистов/команды вокруг конкретных задач, проверяемых критериев, этапов и прозрачной приёмки. Отраслевые вертикали работают поверх общего ядра, а не как отдельные продукты.
+**Единое ядро для рынка работы по измеримому результату.** InCORE Market соединяет бизнес-заказчиков и специалистов/команды вокруг конкретных задач, проверяемых критериев, этапов и прозрачной приёмки.
 
 ## Product slices
 
@@ -13,44 +13,42 @@
 
 ## Current implementation
 
-The first slice is a responsive working prototype with:
-- vertical navigation and a unified task marketplace;
-- task cards with budget, timeframe, outcome and acceptance criteria;
-- task creation form;
-- specialist proposal submission;
-- contract lifecycle state machine with versioned terms, milestones, evidence, acceptance and dispute states;
-- activity/audit trail and example specialist result profiles;
-- fictional seed data so the interface can be explored without credentials.
+- Supabase Auth sign-up/sign-in and server-issued sessions.
+- Account role comes from the authenticated server profile; there is no client-side role switch.
+- Database trigger creates the profile; Postgres RLS restricts task creation/editing and proposal submission by role and record ownership.
+- Employer and candidate have separate navigation and actions in the prototype.
+- Contract/milestone/event writes remain blocked from the browser until validated server-side RPCs are implemented.
+- The marketplace UI still uses fictional seed records and browser-local task/proposal/contract interactions. These are not live marketplace records.
 
-The UI currently persists demo interactions in local browser storage. It is **not** connected to live accounts, a production database, escrow, a payment provider, or a deployed blockchain contract. The contract engine is a domain model and adapter boundary, not a claim that money is held or paid automatically. Before live use, connect authenticated persistence, harden authorization, select a legally suitable payment flow, and add dispute operations.
+## Supabase setup
+
+Follow [docs/SUPABASE-AUTH.md](docs/SUPABASE-AUTH.md). Create a dedicated Supabase project, run **supabase/schema.sql** and then **supabase/migrations/202610280001_auth_rbac.sql**, and configure the two public Vite variables in the GitHub Pages build environment.
+
+**Never expose the Supabase service-role key in the frontend.** RLS must remain enabled.
 
 ## Run locally
 
 Requirements: Node.js 20+.
 
-```bash
-npm install
-npm run dev
-```
+    npm install
+    cp .env.example .env.local
+    npm run dev
 
 Build and type-check:
 
-```bash
-npm run build
-```
+    npm run typecheck
+    npm run build
+    npm test
 
-## Architecture
+## Architecture and trust boundaries
 
-- `src/domain.ts`: shared task/proposal/contract types, allowed state transitions and audit events.
-- `src/App.tsx`: marketplace experience and demo workflows.
-- `supabase/schema.sql`: proposed isolated schema for profiles, tasks, proposals, contracts, milestones, evidence and immutable-style event records with RLS.
-- `docs/PRODUCT-ARCHITECTURE.md`: shared-core/vertical model and integration boundaries.
-- `docs/LAUNCH-CHECKLIST.md`: gates before production use.
+- **src/domain.ts**: task/proposal/contract types and allowed state transitions.
+- **src/App.tsx**: marketplace prototype and demo workflows.
+- **src/auth.tsx**: Supabase session, profile lookup and registration/login.
+- **src/lib/supabase.ts**: public browser client configuration.
+- **supabase/schema.sql**: database tables and baseline RLS.
+- **supabase/migrations/202610280001_auth_rbac.sql**: signup profile trigger and role-specific RLS.
+- **docs/SUPABASE-AUTH.md**: setup and current implementation boundary.
+- **docs/LAUNCH-CHECKLIST.md**: launch gates.
 
-## Safety and trust boundaries
-
-- Demo records are fictional.
-- A result is only verifiable when acceptance criteria are measurable or an authorized reviewer/defined dispute process resolves ambiguity.
-- Contract state is not proof of a legal escrow or payment.
-- Do not put real personal, banking, passport or confidential business data into the demo.
-- Apply the SQL only to a new dedicated Supabase project after review; do not run it against the existing InCORE project blindly.
+A contract status is not proof of legal escrow or payment. Do not enter real personal, banking, passport or confidential business data until server persistence, privacy controls, and security tests are complete.
