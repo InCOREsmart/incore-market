@@ -1,19 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowUpRight, BadgeCheck, Banknote, BriefcaseBusiness, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, FileCheck2, Filter, Gauge, Handshake, Layers3, Plus, Search, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react';
 import { canTransition, contractStatusLabel, money, seedTasks, statusLabel, verticals, type ContractEvent, type ContractStatus, type MarketTask, type Milestone, type Proposal, type VerticalId } from './domain';
+import { AuthScreen, useMarketAuth, type MarketRole } from './auth';
+import { supabaseConfigured } from './lib/supabase';
 
 type Tab = 'market' | 'my-work' | 'contracts' | 'talent';
-type DemoRole = 'employer' | 'candidate';
+type DemoRole = MarketRole;
+type MarketplaceProps = { role: DemoRole; userId: string; email: string; displayName: string; onSignOut: () => void };
 const initialTasks = seedTasks.map((t) => structuredClone(t));
 const dateShort = (iso:string) => new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(new Date(iso));
 const statusTone = (status:string) => ['completed','accepted'].includes(status) ? 'green' : ['disputed','cancelled'].includes(status) ? 'red' : ['in_progress','active','submitted','acceptance'].includes(status) ? 'blue' : 'amber';
 
 export function App() {
-  const [tasks,setTasks] = useState<MarketTask[]>(() => { try { const saved=window.localStorage.getItem('incore-market-demo-tasks'); return saved ? JSON.parse(saved) as MarketTask[] : initialTasks; } catch { return initialTasks; } });
-  useEffect(() => { try { window.localStorage.setItem('incore-market-demo-tasks',JSON.stringify(tasks)); } catch { /* Browser storage may be disabled; the current session still works. */ } },[tasks]);
+  const auth = useMarketAuth();
+  if (!supabaseConfigured) return <AuthScreen />;
+  if (auth.loading) return <main className="auth-shell"><section className="auth-card"><div className="auth-brand"><div className="brand-mark"><Layers3 size={23}/></div><div><strong>InCORE<span>Market</span></strong><small>WORK. PROVE. GROW.</small></div></div><p className="auth-intro">Проверяем серверную сессию и права доступа…</p></section></main>;
+  if (!auth.user) return <AuthScreen />;
+  if (!auth.profile) return <main className="auth-shell"><section className="auth-card"><h1>Не удалось загрузить профиль</h1><p className="auth-intro">{auth.error || 'Профиль недоступен.'}</p><button className="primary-button auth-submit" onClick={()=>void auth.signOut()}>Выйти из аккаунта</button></section></main>;
+  const role: DemoRole = auth.profile.profile_type === 'client' ? 'employer' : 'candidate';
+  return <MarketplaceApp role={role} userId={auth.user.id} email={auth.user.email ?? ''} displayName={auth.profile.display_name} onSignOut={()=>void auth.signOut()} />;
+}
+
+function MarketplaceApp({ role, userId, email, displayName, onSignOut }: MarketplaceProps) {
+  const storageKey = 'incore-market-demo-tasks-' + userId;
+  const [tasks,setTasks] = useState<MarketTask[]>(() => { try { const saved=window.localStorage.getItem(storageKey); return saved ? JSON.parse(saved) as MarketTask[] : initialTasks; } catch { return initialTasks; } });
+  useEffect(() => { try { window.localStorage.setItem(storageKey,JSON.stringify(tasks)); } catch { /* Browser storage may be disabled; the current session still works. */ } },[tasks, storageKey]);
   const [vertical,setVertical] = useState<VerticalId|'all'>('all');
   const [tab,setTab] = useState<Tab>('market');
-  const [role,setRole] = useState<DemoRole>('employer');
   const [query,setQuery] = useState('');
   const [selected,setSelected] = useState<string|null>(null);
   const [showCreate,setShowCreate] = useState(false);
@@ -78,7 +91,7 @@ export function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Layers3 size={23}/></div><div><strong>InCORE<span>Market</span></strong><small>WORK. PROVE. GROW.</small></div></div>
-      <div className="workspace"><div className="workspace-avatar">IC</div><div><strong>{role==='employer'?'Кабинет работодателя':'Кабинет кандидата'}</strong><small>Демо-пространство</small></div></div><div className="role-switch"><button className={role==='employer'?'role-option selected':'role-option'} onClick={()=>{setRole('employer');setTab('market');setSelected(null)}}><Building2 size={15}/>Работодатель</button><button className={role==='candidate'?'role-option selected':'role-option'} onClick={()=>{setRole('candidate');setTab('market');setSelected(null)}}><Users size={15}/>Кандидат</button></div>
+      <div className="workspace"><div className="workspace-avatar">{role==='employer'?'ER':'CA'}</div><div><strong>{role==='employer'?'Кабинет работодателя':'Кабинет кандидата'}</strong><small>Аккаунт подтверждён</small></div></div>
       <div className="nav-label">{role==='employer'?'КАБИНЕТ РАБОТОДАТЕЛЯ':'КАБИНЕТ КАНДИДАТА'}</div>
       <nav>
         <button className={tab==='market'?'nav-item active':'nav-item'} onClick={()=>setTab('market')}><Search size={17}/>{role==='employer'?'Мои задачи и рынок':'Найти работу'} <span className="nav-count">{tasks.filter(t=>t.status==='open'||t.status==='reviewing').length}</span></button>
@@ -90,10 +103,10 @@ export function App() {
       <nav className="vertical-nav">
         {verticals.map(v=><button key={v.id} className={vertical===v.id?'vertical-item selected':'vertical-item'} onClick={()=>{setVertical(v.id);setTab('market')}}><span className={'vertical-dot dot-'+v.id}/><span>{v.label}</span><ChevronRight size={14}/></button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="security-card"><ShieldCheck size={18}/><div><strong>Результат зафиксирован</strong><small>Критерии, этапы, журнал событий</small></div></div><div className="user-row"><div className="user-avatar">{role==='employer'?'ER':'CA'}</div><div><strong>{role==='employer'?'Демо-работодатель':'Демо-кандидат'}</strong><small>{role==='employer'?'Заказчик':'Специалист'} · демо</small></div></div></div>
+      <div className="sidebar-bottom"><div className="security-card"><ShieldCheck size={18}/><div><strong>Доступ по роли</strong><small>Сессия Supabase Auth</small></div></div><div className="user-row"><div className="user-avatar">{role==='employer'?'ER':'CA'}</div><div><strong>{displayName}</strong><small>{email}</small></div></div><button className="signout-button" onClick={onSignOut}>Выйти из аккаунта</button></div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><div className="breadcrumbs"><span>InCORE</span><ChevronRight size={14}/><strong>{tab==='market'?'Маркетплейс':tab==='my-work'?'Моя работа':tab==='contracts'?'Контракты':'Специалисты'}</strong></div><div className="top-actions"><span className="demo-pill"><span/>ДЕМО-РЕЖИМ</span><button className="icon-button" title="Справка" onClick={()=>flash('В демо-режиме изменения сохраняются в локальном хранилище этого браузера.')}><CircleHelp size={18}/></button><div className="top-avatar">{role==='employer'?'ER':'CA'}</div></div></header>
+      <header className="topbar"><div className="breadcrumbs"><span>InCORE</span><ChevronRight size={14}/><strong>{tab==='market'?'Маркетплейс':tab==='my-work'?'Моя работа':tab==='contracts'?'Контракты':'Специалисты'}</strong></div><div className="top-actions"><span className="demo-pill"><span/>ДЕМО-ДАННЫЕ</span><button className="icon-button" title="Справка" onClick={()=>flash('Учётная запись и роль проверяются через Supabase. Данные задач и действия в этом интерфейсе пока демонстрационные и сохраняются только в этом браузере.')}><CircleHelp size={18}/></button><div className="top-avatar">{role==='employer'?'ER':'CA'}</div></div></header>
       <div className="content">
         {tab==='market'&&<><section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/>{vertical==='all'?'RESULT-BASED WORK':verticals.find(v=>v.id===vertical)?.eyebrow}</div><h1>{role==='employer'?(vertical==='all'?'Работа, измеримая результатом':verticals.find(v=>v.id===vertical)?.label):(vertical==='all'?'Найдите задачу под свои компетенции':verticals.find(v=>v.id===vertical)?.label)}</h1><p className="page-subtitle">{role==='employer'?(vertical==='all'?'Публикуйте бизнес-задачи, сравнивайте предложения и принимайте измеримый результат.':verticals.find(v=>v.id===vertical)?.description):(vertical==='all'?'Выберите задачу, предложите решение и согласуйте результат, срок и стоимость.':verticals.find(v=>v.id===vertical)?.description)}</p></div>{role==='employer'&&<button className="primary-button" onClick={()=>setShowCreate(true)}><Plus size={17}/>Опубликовать задачу</button>}</section>
         <section className="metric-grid"><div className="metric-card"><div className="metric-top"><span>Открытые задачи</span><Target size={17}/></div><strong>{tasks.filter(t=>t.status==='open'||t.status==='reviewing').length}</strong><small><span className="metric-positive"><ArrowUpRight size={13}/>Marketplace</span> · доступно для отклика</small></div><div className="metric-card"><div className="metric-top"><span>Бюджет открытых задач</span><Banknote size={17}/></div><strong>{money(totalBudget)}</strong><small>Заявленный бюджет заказчиков</small></div><div className="metric-card"><div className="metric-top"><span>Контракты</span><Handshake size={17}/></div><strong>{allContracts.length}</strong><small>Условия и этапы зафиксированы в демо</small></div><div className="metric-card"><div className="metric-top"><span>Состояния с приёмкой</span><ClipboardCheck size={17}/></div><strong>{tasks.filter(t=>t.status==='acceptance'||t.status==='completed').length}</strong><small><span className="metric-positive"><ShieldCheck size={13}/>Критерии</span> · журнал событий</small></div></section>
