@@ -23,6 +23,10 @@ This project uses Supabase Auth for server-issued sessions and Postgres Row Leve
 - Contract, milestone and contract-event tables intentionally have no browser write policies. Validated server-side RPCs are required before contract lifecycle writes can be enabled.
 - Public task discovery and authenticated profile discovery are separate from permission to mutate records.
 
+## Additional task lifecycle guardrail
+
+Apply `supabase/migrations/202610290001_market_task_guardrails.sql` after the auth/RLS migration. It removes direct task-update permission and exposes `transition_market_task(...)`, which validates the authenticated owner, employer role, and allowed status transitions. This migration does not make the current UI server-backed: task/proposal/contract screens still use demo records until the data layer is replaced and tested.
+
 ## Current implementation boundary
 
 Authentication/session and the RLS foundation are real once the project and build variables are configured. The marketplace task/proposal/contract UI still contains demo seed records and browser-local interactions. Those are **not** server-persisted marketplace records and must not be used for real customer data. The next integration step is to replace those local mutations with authenticated Supabase queries and validated RPCs, then add cross-account RLS integration tests before production use.
