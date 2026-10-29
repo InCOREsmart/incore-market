@@ -15,14 +15,15 @@
 
 - Supabase Auth sign-up/sign-in and server-issued sessions.
 - Account role comes from the authenticated server profile; there is no client-side role switch.
-- Database trigger creates the profile; Postgres RLS restricts task creation/editing and proposal submission by role and record ownership.
+- Database trigger creates the profile; Postgres RLS restricts task creation and proposal submission by role and record ownership.
+- A follow-up migration disables direct task updates and validates task status changes through a database function.
 - Employer and candidate have separate navigation and actions in the prototype.
 - Contract/milestone/event writes remain blocked from the browser until validated server-side RPCs are implemented.
 - The marketplace UI still uses fictional seed records and browser-local task/proposal/contract interactions. These are not live marketplace records.
 
 ## Supabase setup
 
-Follow [docs/SUPABASE-AUTH.md](docs/SUPABASE-AUTH.md). Create a dedicated Supabase project, run **supabase/schema.sql** and then **supabase/migrations/202610280001_auth_rbac.sql**, and configure the two public Vite variables in the GitHub Pages build environment.
+Follow [docs/SUPABASE-AUTH.md](docs/SUPABASE-AUTH.md). Create a dedicated Supabase project, run **supabase/schema.sql**, then **supabase/migrations/202610280001_auth_rbac.sql** and **supabase/migrations/202610290001_market_task_guardrails.sql**, and configure the two public Vite variables in the GitHub Pages build environment.
 
 **Never expose the Supabase service-role key in the frontend.** RLS must remain enabled.
 
