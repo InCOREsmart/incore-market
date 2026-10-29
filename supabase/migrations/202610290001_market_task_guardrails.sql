@@ -41,11 +41,7 @@ begin
 
   if not (
     (current_task.status = 'open' and p_next_status in ('reviewing', 'cancelled')) or
-    (current_task.status = 'reviewing' and p_next_status in ('open', 'contracting', 'cancelled')) or
-    (current_task.status = 'contracting' and p_next_status in ('reviewing', 'in_progress', 'cancelled')) or
-    (current_task.status = 'in_progress' and p_next_status in ('acceptance', 'disputed', 'cancelled')) or
-    (current_task.status = 'acceptance' and p_next_status in ('in_progress', 'completed', 'disputed')) or
-    (current_task.status = 'disputed' and p_next_status in ('in_progress', 'cancelled'))
+    (current_task.status = 'reviewing' and p_next_status in ('open', 'cancelled'))
   ) then
     raise exception 'Invalid task status transition: % -> %', current_task.status, p_next_status
       using errcode = '22023';
@@ -63,6 +59,8 @@ $$;
 revoke all on function public.transition_market_task(uuid, public.market_task_status) from public;
 grant execute on function public.transition_market_task(uuid, public.market_task_status) to authenticated;
 
+-- Contract-related task states are intentionally unreachable until contract lifecycle RPCs
+-- exist. This prevents status-only changes from pretending a contract was created or accepted.
 -- The RPC is the only browser-accessible task update path. Keep the table protected
 -- against accidental future policy grants by revoking direct UPDATE from client roles.
 revoke update on public.market_tasks from anon, authenticated;
