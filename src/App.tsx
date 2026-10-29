@@ -17,6 +17,7 @@ export function App() {
   if (auth.loading) return <main className="auth-shell"><section className="auth-card"><div className="auth-brand"><div className="brand-mark"><Layers3 size={23}/></div><div><strong>InCORE<span>Market</span></strong><small>WORK. PROVE. GROW.</small></div></div><p className="auth-intro">Проверяем серверную сессию и права доступа…</p></section></main>;
   if (!auth.user) return <AuthScreen />;
   if (!auth.profile) return <main className="auth-shell"><section className="auth-card"><h1>Не удалось загрузить профиль</h1><p className="auth-intro">{auth.error || 'Профиль недоступен.'}</p><button className="primary-button auth-submit" onClick={()=>void auth.signOut()}>Выйти из аккаунта</button></section></main>;
+  if (auth.profile.profile_type === 'both') return <main className="auth-shell"><section className="auth-card"><h1>Для этого профиля нет отдельного кабинета</h1><p className="auth-intro">Сейчас интерфейс поддерживает раздельные роли работодателя и специалиста. Профиль с двумя ролями нельзя автоматически считать специалистом: это смешало бы права кабинета.</p><button className="primary-button auth-submit" onClick={()=>void auth.signOut()}>Выйти из аккаунта</button></section></main>;
   const role: DemoRole = auth.profile.profile_type === 'client' ? 'employer' : 'candidate';
   return <MarketplaceApp role={role} userId={auth.user.id} email={auth.user.email ?? ''} displayName={auth.profile.display_name} onSignOut={()=>void auth.signOut()} />;
 }
