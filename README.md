@@ -19,11 +19,12 @@
 - A follow-up migration disables direct task updates and validates task status changes through a database function.
 - Employer and candidate have separate navigation and actions in the prototype.
 - Contract/milestone/event writes remain blocked from the browser until validated server-side RPCs are implemented.
-- The marketplace UI still uses fictional seed records and browser-local task/proposal/contract interactions. These are not live marketplace records.
+- Tasks and proposals are persisted in Supabase and scoped by database RLS.
+- Contract creation, milestones, evidence, disputes and payments are not yet implemented server-side.
 
 ## Supabase setup
 
-Follow [docs/SUPABASE-AUTH.md](docs/SUPABASE-AUTH.md). Create a dedicated Supabase project, run **supabase/schema.sql**, then **supabase/migrations/202610280001_auth_rbac.sql** and **supabase/migrations/202610290001_market_task_guardrails.sql**, and configure the two public Vite variables in the GitHub Pages build environment.
+Follow [docs/SUPABASE-AUTH.md](docs/SUPABASE-AUTH.md). Create a dedicated Supabase project, run **supabase/schema.sql**, then **supabase/migrations/202610280001_auth_rbac.sql** and **supabase/migrations/202610290001_market_task_guardrails.sql**, then **supabase/migrations/202610300001_marketplace_data.sql**, and configure the two public Vite variables in the GitHub Pages build environment.
 
 **Never expose the Supabase service-role key in the frontend.** RLS must remain enabled.
 
