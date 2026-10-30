@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowUpRight, BadgeCheck, Banknote, BriefcaseBusiness, Building2, Check, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, FileCheck2, Filter, Gauge, Handshake, Layers3, Plus, Search, ShieldCheck, Sparkles, Target, Users, X } from 'lucide-react';
-import { canTransition, contractStatusLabel, money, seedTasks, statusLabel, verticals, type ContractEvent, type ContractStatus, type MarketTask, type Milestone, type Proposal, type VerticalId } from './domain';
+import { canTransition, contractStatusLabel, money, statusLabel, verticals, type ContractEvent, type ContractStatus, type MarketTask, type Milestone, type Proposal, type VerticalId } from './domain';
 import { AuthScreen, useMarketAuth, type MarketRole } from './auth';
 import { supabaseConfigured } from './lib/supabase';
+import { createMarketplaceProposal, createMarketplaceTask, loadMarketplaceTasks } from './lib/marketplace';
 
 type Tab = 'market' | 'my-work' | 'contracts' | 'talent';
 type DemoRole = MarketRole;
 type MarketplaceProps = { role: DemoRole; userId: string; email: string; displayName: string; onSignOut: () => void };
-const initialTasks = seedTasks.map((t) => structuredClone(t));
 const dateShort = (iso:string) => new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(new Date(iso));
 const statusTone = (status:string) => ['completed','accepted'].includes(status) ? 'green' : ['disputed','cancelled'].includes(status) ? 'red' : ['in_progress','active','submitted','acceptance'].includes(status) ? 'blue' : 'amber';
 
@@ -23,9 +23,15 @@ export function App() {
 }
 
 function MarketplaceApp({ role, userId, email, displayName, onSignOut }: MarketplaceProps) {
-  const storageKey = 'incore-market-demo-tasks-' + userId;
-  const [tasks,setTasks] = useState<MarketTask[]>(() => { try { const saved=window.localStorage.getItem(storageKey); return saved ? JSON.parse(saved) as MarketTask[] : initialTasks; } catch { return initialTasks; } });
-  useEffect(() => { try { window.localStorage.setItem(storageKey,JSON.stringify(tasks)); } catch { /* Browser storage may be disabled; the current session still works. */ } },[tasks, storageKey]);
+  const [tasks,setTasks] = useState<MarketTask[]>([]);
+  const [dataLoading,setDataLoading] = useState(true);
+  const [dataError,setDataError] = useState('');
+  const reloadTasks = async () => {
+    try { setDataError(''); setTasks(await loadMarketplaceTasks(userId)); }
+    catch (error) { setDataError(error instanceof Error ? error.message : 'Не удалось загрузить данные рынка.'); }
+    finally { setDataLoading(false); }
+  };
+  useEffect(() => { void reloadTasks(); }, [userId]);
   const [vertical,setVertical] = useState<VerticalId|'all'>('all');
   const [tab,setTab] = useState<Tab>('market');
   const [query,setQuery] = useState('');
@@ -41,33 +47,31 @@ function MarketplaceApp({ role, userId, email, displayName, onSignOut }: Marketp
   const allContracts = tasks.filter((t) => t.contract && (role==='employer' || t.contract.specialist===displayName));
   const myWork = role==='employer' ? tasks.filter((t) => t.status==='in_progress'||t.status==='acceptance'||t.status==='completed'||t.status==='disputed') : tasks.filter((t) => t.proposals.some(p=>p.specialist===displayName));
   const totalBudget = tasks.filter((t)=>t.status==='open').reduce((sum,t)=>sum+t.budget,0);
-  const updateTask = (id:string,fn:(task:MarketTask)=>MarketTask) => setTasks((current)=>current.map((t)=>t.id===id?fn(t):t));
+  const updateTask = (_id:string,_fn:(task:MarketTask)=>MarketTask) => { flash('Изменение локального состояния отключено: используйте серверные операции.'); };
   const flash = (message:string) => { setNotice(message); window.setTimeout(()=>setNotice(''),3800); };
-  function createTask() {
+  async function createTask() {
     const budget=Number(form.budget);const days=Number(form.days);
     if (!form.title.trim()||!form.outcome.trim()||!Number.isFinite(budget)||budget<=0||!Number.isInteger(days)||days<=0) { flash('Укажите название, ожидаемый результат, положительный бюджет и срок в целых днях.'); return; }
-    const item:MarketTask={id:'task-'+Date.now(),title:form.title.trim(),vertical:form.vertical,category:form.category,company:form.company.trim()||'Заказчик',description:form.description.trim(),outcome:form.outcome.trim(),criteria:form.criteria.split('\n').map(x=>x.trim()).filter(Boolean),budget,days,skills:form.skills.split(',').map(x=>x.trim()).filter(Boolean),status:'open',proposals:[],createdAt:new Date().toISOString()};
-    setTasks((current)=>[item,...current]);setVertical(item.vertical);setSelected(item.id);setShowCreate(false);setTab('market');flash('Задача опубликована в демонстрационном пространстве.');
+    try {
+      const id=await createMarketplaceTask({userId,vertical:form.vertical,category:form.category,title:form.title.trim(),company:form.company.trim()||displayName,description:form.description.trim(),outcome:form.outcome.trim(),criteria:form.criteria.split('\n').map(x=>x.trim()).filter(Boolean),budget,days,skills:form.skills.split(',').map(x=>x.trim()).filter(Boolean)});
+      await reloadTasks();setVertical(form.vertical);setSelected(id);setShowCreate(false);setTab('market');flash('Задача сохранена на сервере.');
+    } catch(error) { flash(error instanceof Error ? error.message : 'Не удалось опубликовать задачу.'); }
   }
-  function submitProposal(taskId:string) {
+  async function submitProposal(taskId:string) {
     const task=tasks.find(t=>t.id===taskId); if(!task) return;
     const price=Number(proposalForm.price);const days=Number(proposalForm.days);
     if(!['open','reviewing'].includes(task.status)||task.contract){flash('Приём предложений по этой задаче закрыт.');return;}
     if(!proposalForm.headline.trim()||!proposalForm.pitch.trim()||!Number.isFinite(price)||price<=0||!Number.isInteger(days)||days<=0){flash('Укажите подход, описание, положительную стоимость и срок в целых днях.');return;}
-    const p:Proposal={id:'p-'+Date.now(),specialist:proposalForm.specialist.trim()||'Специалист',headline:proposalForm.headline.trim(),pitch:proposalForm.pitch.trim(),price,days,skills:proposalForm.skills.split(',').map(x=>x.trim()).filter(Boolean),score:0,createdAt:new Date().toISOString()};
-    updateTask(taskId,(t)=>({...t,proposals:[p,...t.proposals],status:t.status==='open'?'reviewing':t.status}));setShowProposal(null);setProposalForm({specialist:displayName,headline:'',pitch:'',price:'',days:'20',skills:''});flash('Предложение добавлено. Это локальные демоданные.');
+    try {
+      await createMarketplaceProposal({taskId,userId,headline:proposalForm.headline.trim(),approach:proposalForm.pitch.trim(),price,days,skills:proposalForm.skills.split(',').map(x=>x.trim()).filter(Boolean)});
+      await reloadTasks();setShowProposal(null);setProposalForm({specialist:displayName,headline:'',pitch:'',price:'',days:'20',skills:''});flash('Отклик сохранён на сервере.');
+    } catch(error) { flash(error instanceof Error ? error.message : 'Не удалось отправить отклик.'); }
   }
-  function selectProposal(task:MarketTask,p:Proposal) {
-    if (task.contract || !['open','reviewing'].includes(task.status)) { flash('Для этой задачи уже начато согласование контракта.'); return; }
-    if (!task.proposals.some((candidate) => candidate.id === p.id)) { flash('Предложение больше недоступно.'); return; }
-    const now=new Date().toISOString();
-    const milestones:Milestone[]=[{id:'m1',title:'Диагностика и базовая линия',amount:Math.round(p.price*.3),due:dateShort(new Date(Date.now()+7*86400000).toISOString()),criteria:'Согласованный документ с исходными данными, источниками и допущениями.',status:'pending'},{id:'m2',title:'Решение и план внедрения',amount:Math.round(p.price*.4),due:dateShort(new Date(Date.now()+16*86400000).toISOString()),criteria:'Решение, расчёт эффекта, владельцы, сроки и риски.',status:'pending'},{id:'m3',title:'Итоговая защита и передача',amount:p.price-Math.round(p.price*.3)-Math.round(p.price*.4),due:dateShort(new Date(Date.now()+Number(p.days)*86400000).toISOString()),criteria:'Итоговый результат передан заказчику и проверен по критериям.',status:'pending'}];
-    const event:ContractEvent={id:'e-'+Date.now(),at:now,actor:'Заказчик',type:'terms_proposed',detail:'Создана версия 1 условий на основе выбранного предложения.',version:1};
-    const contract={id:'contract-'+Date.now(),version:1,status:'proposed' as ContractStatus,client:task.company,specialist:p.specialist,amount:p.price,scope:task.outcome,acceptanceCriteria:[...task.criteria],milestones,events:[event]};
-    updateTask(task.id,(t)=>({...t,status:'contracting',contract}));setTab('contracts');flash('Черновик контракта создан. Никакие деньги не резервируются.');
+  function selectProposal(_task:MarketTask,_p:Proposal) {
+    flash('Серверный модуль контрактов ещё не подключён. Выбор исполнителя временно недоступен, чтобы не создавать фиктивную сделку.');
   }
   function transition(task:MarketTask,to:ContractStatus) {
-    const c=task.contract;if(!c||!canTransition(c.status,to)){flash('Переход запрещён текущим состоянием контракта.');return;}
+    const c=task.contract;if(!c||!canTransition(c.status,to)){flash('Переход запрещён текущим состоянием контракта.');return;} flash('Серверный жизненный цикл контрактов ещё не подключён.'); return;
     if(to==='accepted'&&!c.milestones.some(m=>m.status==='submitted')){flash('Нельзя принять контракт без переданного на проверку этапа.');return;}
     const milestones=to==='accepted'
       ? c.milestones.map(m=>m.status==='submitted'?{...m,status:'accepted' as const}:m)
@@ -82,7 +86,7 @@ function MarketplaceApp({ role, userId, email, displayName, onSignOut }: Marketp
     updateTask(task.id,(t)=>({...t,status:finalStatus==='active'?'in_progress':finalStatus==='submitted'?'acceptance':finalStatus==='accepted'?'completed':finalStatus==='disputed'?'disputed':finalStatus==='cancelled'?'cancelled':'contracting',contract:{...c,status:finalStatus,milestones,events:[event,...c.events]}}));flash('Событие записано в локальный журнал. Это не блокчейн и не платёж.');
   }
   function addEvidence(task:MarketTask,milestoneId:string) {
-    if (!task.contract || task.contract.status !== 'active' || !canTransition(task.contract.status, 'submitted')) { flash('Подтверждение можно добавить только в активном контракте.'); return; }
+    if (!task.contract || task.contract.status !== 'active' || !canTransition(task.contract.status, 'submitted')) { flash('Подтверждение можно добавить только в активном контракте.'); return; } flash('Серверное хранение подтверждений ещё не подключено.'); return;
     const milestone=task.contract.milestones.find((m)=>m.id===milestoneId);
     if (!milestone || !['pending','rejected'].includes(milestone.status)) { flash('Этот этап уже отправлен или закрыт.'); return; }
     const evidence=window.prompt('Ссылка или описание подтверждения результата:');if(!evidence?.trim())return;
@@ -108,7 +112,7 @@ function MarketplaceApp({ role, userId, email, displayName, onSignOut }: Marketp
     </aside>
     <main className="main-area">
       <header className="topbar"><div className="breadcrumbs"><span>InCORE</span><ChevronRight size={14}/><strong>{tab==='market'?'Маркетплейс':tab==='my-work'?'Моя работа':tab==='contracts'?'Контракты':'Специалисты'}</strong></div><div className="top-actions"><span className="demo-pill"><span/>ДЕМО-ДАННЫЕ</span><button className="icon-button" title="Справка" onClick={()=>flash('Учётная запись и роль проверяются через Supabase. Данные задач и действия в этом интерфейсе пока демонстрационные и сохраняются только в этом браузере.')}><CircleHelp size={18}/></button><div className="top-avatar">{role==='employer'?'ER':'CA'}</div></div></header>
-      <div className="content">
+      <div className="content">{dataLoading&&<div className="auth-notice" role="status">Загружаем задачи и отклики из серверной базы…</div>}{dataError&&<div className="auth-error" role="alert">{dataError}</div>}
         {tab==='market'&&<><section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/>{vertical==='all'?'RESULT-BASED WORK':verticals.find(v=>v.id===vertical)?.eyebrow}</div><h1>{role==='employer'?(vertical==='all'?'Работа, измеримая результатом':verticals.find(v=>v.id===vertical)?.label):(vertical==='all'?'Найдите задачу под свои компетенции':verticals.find(v=>v.id===vertical)?.label)}</h1><p className="page-subtitle">{role==='employer'?(vertical==='all'?'Публикуйте бизнес-задачи, сравнивайте предложения и принимайте измеримый результат.':verticals.find(v=>v.id===vertical)?.description):(vertical==='all'?'Выберите задачу, предложите решение и согласуйте результат, срок и стоимость.':verticals.find(v=>v.id===vertical)?.description)}</p></div>{role==='employer'&&<button className="primary-button" onClick={()=>setShowCreate(true)}><Plus size={17}/>Опубликовать задачу</button>}</section>
         <section className="metric-grid"><div className="metric-card"><div className="metric-top"><span>Открытые задачи</span><Target size={17}/></div><strong>{tasks.filter(t=>t.status==='open'||t.status==='reviewing').length}</strong><small><span className="metric-positive"><ArrowUpRight size={13}/>Marketplace</span> · доступно для отклика</small></div><div className="metric-card"><div className="metric-top"><span>Бюджет открытых задач</span><Banknote size={17}/></div><strong>{money(totalBudget)}</strong><small>Заявленный бюджет заказчиков</small></div><div className="metric-card"><div className="metric-top"><span>Контракты</span><Handshake size={17}/></div><strong>{allContracts.length}</strong><small>Условия и этапы зафиксированы в демо</small></div><div className="metric-card"><div className="metric-top"><span>Состояния с приёмкой</span><ClipboardCheck size={17}/></div><strong>{tasks.filter(t=>t.status==='acceptance'||t.status==='completed').length}</strong><small><span className="metric-positive"><ShieldCheck size={13}/>Критерии</span> · журнал событий</small></div></section>
         {role==='employer'&&<section className="vertical-banner"><div className="banner-icon"><Gauge size={22}/></div><div className="banner-copy"><span>ВЕРТИКАЛЬ НА ФОКУСЕ</span><strong>{verticals.find(v=>v.id==='efficiency')?.label}</strong><p>От роста ФОТ к производительности: задачи с экономическим эффектом и проверяемыми допущениями.</p></div><button className="text-button" onClick={()=>{setVertical('efficiency');setQuery('')}}>Смотреть задачи <ArrowUpRight size={15}/></button><div className="banner-watermark">01</div></section>}
